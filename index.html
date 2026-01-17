@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AERION CARGO – Air Freight Intelligence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+<!-- Plotly -->
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+<style>
+:root{
+  --bg:#0b0e14;
+  --card:rgba(255,255,255,0.08);
+  --neon:#00f2ff;
+  --violet:#6a5cff;
+  --text:#eaeaea;
+}
+
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  font-family:Inter,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.dashboard{
+  width:100vw;
+  height:100vh;
+  padding:16px;
+  display:grid;
+  grid-template-rows:auto auto 1fr;
+  gap:16px;
+}
+
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+h1{
+  font-family:Orbitron;
+  color:var(--neon);
+  margin:0;
+}
+
+.filters{
+  display:flex;
+  gap:12px;
+}
+
+select{
+  background:#111;
+  color:white;
+  border:1px solid var(--neon);
+  padding:6px;
+  min-width:160px;
+}
+
+.kpis{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px;
+}
+
+.kpi{
+  background:var(--card);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:12px;
+  padding:16px;
+  min-height:120px;
+}
+
+.kpi h3{
+  margin:0;
+  font-size:13px;
+  opacity:.7;
+}
+
+.kpi p{
+  font-size:26px;
+  margin:8px 0 0;
+  font-weight:600;
+  color:var(--neon);
+}
+
+.main{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:16px;
+}
+
+.grid2{
+  display:grid;
+  grid-template-rows:1fr 1fr;
+  gap:16px;
+}
+
+.card{
+  background:var(--card);
+  backdrop-filter:blur(14px);
+  border-radius:14px;
+  padding:12px;
+}
+
+.chart{
+  height:360px;
+}
+</style>
+</head>
+
+<body>
+<div class="dashboard">
+
+<header>
+  <h1>AERION CARGO</h1>
+  <div class="filters">
+    <select id="origin" multiple></select>
+    <select id="destination" multiple></select>
+    <select id="status" multiple></select>
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><h3>Shipments</h3><p id="kpiShip">0</p></div>
+  <div class="kpi"><h3>Total Revenue</h3><p id="kpiRev">$0</p></div>
+  <div class="kpi"><h3>Total Cost</h3><p id="kpiCost">$0</p></div>
+  <div class="kpi"><h3>Profit</h3><p id="kpiProfit">$0</p></div>
+</section>
+
+<section class="main">
+  <div class="card"><div id="map" class="chart"></div></div>
+  <div class="grid2">
+    <div class="card"><div id="bar" class="chart"></div></div>
+    <div class="card"><div id="pie" class="chart"></div></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+// ---------- DATA GENERATION ----------
+const origins=["USA","Germany","China","Brazil","UAE","Japan"];
+const destinations=["UK","France","India","Canada","Australia","Mexico"];
+const statuses=["Delivered","Delayed","In Transit","On Time"];
+
+const data=[];
+for(let i=0;i<1200;i++){
+  data.push({
+    origin:origins[Math.floor(Math.random()*origins.length)],
+    destination:destinations[Math.floor(Math.random()*destinations.length)],
+    status:statuses[Math.floor(Math.random()*statuses.length)],
+    revenue:Math.floor(2000+Math.random()*8000),
+    cost:Math.floor(1000+Math.random()*4000),
+    lat:-60+Math.random()*120,
+    lon:-180+Math.random()*360
+  });
+}
+
+// ---------- FILTER SETUP ----------
+function fillSelect(id,arr){
+  const s=document.getElementById(id);
+  [...new Set(arr)].forEach(v=>{
+    const o=document.createElement("option");
+    o.value=o.text=v;
+    s.appendChild(o);
+  });
+}
+
+fillSelect("origin",data.map(d=>d.origin));
+fillSelect("destination",data.map(d=>d.destination));
+fillSelect("status",data.map(d=>d.status));
+
+document.querySelectorAll("select").forEach(s=>s.onchange=render);
+
+// ---------- RENDER ----------
+function render(){
+  const o=[...origin.selectedOptions].map(o=>o.value);
+  const d=[...destination.selectedOptions].map(o=>o.value);
+  const s=[...status.selectedOptions].map(o=>o.value);
+
+  const f=data.filter(x=>
+    (!o.length||o.includes(x.origin)) &&
+    (!d.length||d.includes(x.destination)) &&
+    (!s.length||s.includes(x.status))
+  );
+
+  const rev=f.reduce((a,b)=>a+b.revenue,0);
+  const cost=f.reduce((a,b)=>a+b.cost,0);
+
+  kpiShip.textContent=f.length;
+  kpiRev.textContent="$"+rev.toLocaleString();
+  kpiCost.textContent="$"+cost.toLocaleString();
+  kpiProfit.textContent="$"+(rev-cost).toLocaleString();
+
+  Plotly.newPlot("map",[{
+    type:"scattergeo",
+    lat:f.map(x=>x.lat),
+    lon:f.map(x=>x.lon),
+    mode:"markers",
+    marker:{size:6,color:"#00f2ff"}
+  }],{
+    geo:{projection:{type:"natural earth"},bgcolor:"transparent"},
+    paper_bgcolor:"transparent",
+    plot_bgcolor:"transparent",
+    margin:{t:0,b:0,l:0,r:0}
+  });
+
+  Plotly.newPlot("bar",[{
+    x:origins,
+    y:origins.map(o=>f.filter(x=>x.origin===o).length),
+    type:"bar",
+    marker:{color:"#6a5cff"}
+  }],{
+    paper_bgcolor:"transparent",
+    plot_bgcolor:"transparent",
+    font:{color:"white"},
+    title:"Shipments by Origin"
+  });
+
+  Plotly.newPlot("pie",[{
+    labels:statuses,
+    values:statuses.map(s=>f.filter(x=>x.status===s).length),
+    type:"pie"
+  }],{
+    paper_bgcolor:"transparent",
+    font:{color:"white"},
+    title:"Status Distribution"
+  });
+}
+
+render();
+</script>
+</body>
+</html>
